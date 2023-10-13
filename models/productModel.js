@@ -4,12 +4,12 @@ const productSchema = new mongoose.Schema(
   {
     name: {
       type: String,
-      required: [true, "A product must have a name"],
+      // required: [true, "A product must have a name"],
       unique: true,
     },
     price: {
       type: Number,
-      required: [true, "A product must have a price"],
+      // required: [true, "A product must have a price"],
     },
     priceDiscount: {
       type: Number,
@@ -17,8 +17,9 @@ const productSchema = new mongoose.Schema(
         validator: function (value) {
           return value < this.price;
         },
-        message: "Discount must be below the regular price",
+        // message: "Discount must be below the regular price",
       },
+      default: 0.0,
     },
     ratings: {
       type: Number,
@@ -41,6 +42,10 @@ const productSchema = new mongoose.Schema(
         message:
           "Category is either: Electronics, Clothes, Jewlery, Food, Berverage",
       },
+    },
+    createdAt: {
+      type: Date,
+      default: Date.now(),
     },
   },
   {

@@ -1,128 +1,80 @@
 const Product = require("./../models/productModel");
 const multer = require("multer");
 const path = require("path");
+const catchAsync = require("../utilities/catchAsync");
+const AppError = require("../utilities/AppError");
+const APIFeatures = require("../utilities/APIFeatures");
 
-exports.getAllProducts = async (req, res) => {
-  try {
-    const queryObj = { ...req.query };
-    const excludedFields = ["page", "sort", "limit", "fields"];
-    excludedFields.forEach((el) => delete queryObj[el]);
+exports.getAllProducts = catchAsync(async (req, res, next) => {
+  const features = new APIFeatures(Product.find(), req.query)
+    .filter()
+    .sort()
+    .limitFields()
+    .paginate();
+  const products = await features.query;
+  // console.log(query);
 
-    let queryStr = JSON.stringify(queryObj);
-    queryStr = queryStr.replace(/\b{gte|gt|lte|lt}\b/g, (match) => `$${match}`);
-    let query = Product.find(JSON.parse(queryStr));
+  res.status(200).json({
+    status: "success",
+    data: {
+      products,
+    },
+  });
+});
 
-    if (req.query.sort) {
-      const sortBy = req.query.sort.split(",").join(" ");
-      query = query.sort(sortBy);
-    } else {
-      query = query.sort("-ratings");
-    }
+exports.createProduct = catchAsync(async (req, res) => {
+  const { name, price, description } = req.body;
+  const imageUrl = req.file ? `/images/${req.file.filename}` : null;
+  console.log(imageUrl);
 
-    const products = await query;
-    // console.log(query);
+  const newProduct = await Product.create({
+    name,
+    price,
+    description,
+    imageUrl,
+  });
+  console.log("PRODUCT: ", newProduct);
+  res.status(201).json({
+    status: "success",
+    data: {
+      product: newProduct,
+    },
+  });
+});
 
-    res.status(200).json({
-      status: "success",
-      data: {
-        products,
-      },
-    });
-  } catch (error) {
-    res.status(400).json({
-      status: "fail",
-      data: {
-        message: error.message,
-      },
-    });
-  }
-};
+exports.getProduct = catchAsync(async (req, res, next) => {
+  const product = await Product.findById(req.params.id);
+  if (!product)
+    return next(new AppError("No product found with that ID ", 404));
+  res.status(200).json({
+    status: "success",
+    data: {
+      product,
+    },
+  });
+});
 
-exports.createProduct = async (req, res) => {
-  try {
-    const { name, price, description } = req.body;
-    const imageUrl = req.file ? `/images/${req.file.filename}` : null;
+exports.updateProduct = catchAsync(async (req, res) => {
+  const product = await Product.findByIdAndUpdate(req.params.id, req.body, {
+    new: true,
+    runValidators: true,
+  });
 
-    const newProduct = await Product.create({
-      name,
-      price,
-      description,
-      imageUrl,
-    });
-    console.log(newProduct);
-    res.status(201).json({
-      status: "success",
-      data: {
-        product: newProduct,
-      },
-    });
-  } catch (error) {
-    res.status(400).json({
-      status: "fail",
-      data: {
-        message: error.message,
-      },
-    });
-  }
-};
-
-exports.getProduct = async (req, res) => {
-  try {
-    const product = await Product.findById(req.params.id);
-    res.status(200).json({
-      status: "success",
-      data: {
-        product,
-      },
-    });
-  } catch (error) {
-    res.status(400).json({
-      status: "fail",
-      data: {
-        message: error.message,
-      },
-    });
-  }
-};
-
-exports.updateProduct = async (req, res) => {
-  try {
-    const product = await Product.findByIdAndUpdate(req.params.id, req.body, {
-      new: true,
-      runValidators: true,
-    });
-
-    res.status(200).json({
-      status: "success",
-      data: {
-        product,
-      },
-    });
-  } catch (error) {
-    res.status(400).json({
-      status: "fail",
-      data: {
-        message: error.message,
-      },
-    });
-  }
-};
-exports.deleteProduct = async (req, res) => {
-  try {
-    await Product.findByIdAndDelete(req.params.id);
-    res.status(204).json({
-      status: "success",
-      data: null,
-    });
-  } catch (error) {
-    res.status(400).json({
-      status: "fail",
-      data: {
-        message: error.message,
-      },
-    });
-  }
-};
+  res.status(200).json({
+    status: "success",
+    data: {
+      product,
+    },
+  });
+});
+exports.deleteProduct = catchAsync(async (req, res, next) => {
+  const product = await Product.findByIdAndDelete(req.params.id);
+  if (!product) next(new AppError("No product found with that ID", 404));
+  res.status(204).json({
+    status: "success",
+    data: null,
+  });
+});
 
 const filestorageEngine = multer.diskStorage({
   destination: (req, file, cb) => {
@@ -135,4 +87,4 @@ const filestorageEngine = multer.diskStorage({
   },
 });
 
-exports.upload = multer({ storage: filestorageEngine });
+exports.upload = multer({ storage: filestorageEngine }).single("image");
